@@ -26,10 +26,10 @@ Java_com_tools_player_EnjoyPlayer_nativeInit(JNIEnv *env, jobject thiz) {
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_tools_player_EnjoyPlayer_setDataSource(JNIEnv
-                                                     *env,
-                                                     jobject thiz, jlong
-                                                     nativeHandle,
-                                                     jstring path_
+                                                *env,
+                                                jobject thiz, jlong
+                                                nativeHandle,
+                                                jstring path_
 ) {
     const char *path = env->GetStringUTFChars(path_, 0);
     EnjoyPlayer *player = reinterpret_cast<EnjoyPlayer *>(nativeHandle);
@@ -45,9 +45,9 @@ Java_com_tools_player_EnjoyPlayer_setDataSource(JNIEnv
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_tools_player_EnjoyPlayer_prepare(JNIEnv
-                                               *env,
-                                               jobject thiz, jlong
-                                               nativeHandle) {
+                                          *env,
+                                          jobject thiz, jlong
+                                          nativeHandle) {
     EnjoyPlayer *player = reinterpret_cast<EnjoyPlayer *>(nativeHandle);
     player->
 
@@ -58,9 +58,9 @@ Java_com_tools_player_EnjoyPlayer_prepare(JNIEnv
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_tools_player_EnjoyPlayer_start(JNIEnv
-                                             *env,
-                                             jobject thiz, jlong
-                                             nativeHandle) {
+                                        *env,
+                                        jobject thiz, jlong
+                                        nativeHandle) {
     EnjoyPlayer *player = reinterpret_cast<EnjoyPlayer *>(nativeHandle);
     player->
 
@@ -73,14 +73,21 @@ Java_com_tools_player_EnjoyPlayer_start(JNIEnv
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_tools_player_EnjoyPlayer_setSurface(JNIEnv
-                                                  *env,
-                                                  jobject thiz, jlong
-                                                  nativeHandle,
-                                                  jobject surface
+                                             *env,
+                                             jobject thiz, jlong
+                                             nativeHandle,
+                                             jobject surface
 ) {
 
     EnjoyPlayer *player = reinterpret_cast<EnjoyPlayer *>(nativeHandle);
     ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
     player->
             setWindow(window);
+}extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_player_EnjoyPlayer_stop(JNIEnv *env, jobject thiz, jlong nativeHandle) {
+
+    EnjoyPlayer *player = reinterpret_cast<EnjoyPlayer *>(nativeHandle);
+    player->stop();
+    delete player;
 }

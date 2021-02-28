@@ -8,6 +8,7 @@
 
 #include <android/native_window.h>
 #include "BaseChannel.h"
+#include "AudioChannel.h"
 
 extern "C" {
 #include "libavcodec/avcodec.h"
@@ -31,6 +32,8 @@ public:
     virtual void stop();
 
     virtual void decode();
+
+    AudioChannel *audioChannel = nullptr;
 
 private:
     void _play();

@@ -24,7 +24,13 @@ class EnjoyPlayer {
 public:
     EnjoyPlayer(JavaCallHelper *helper);
 
+    ~EnjoyPlayer();
+
     void start();
+
+    void stop();
+
+    void release();
 
     void setWindow(ANativeWindow *window);
 

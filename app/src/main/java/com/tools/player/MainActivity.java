@@ -43,4 +43,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
   public void surfaceDestroyed(SurfaceHolder holder) {
 
   }
+
+  @Override
+  protected void onStop() {
+    super.onStop();
+    player.stop();
+  }
 }

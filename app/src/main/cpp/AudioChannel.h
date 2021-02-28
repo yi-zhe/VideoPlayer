@@ -32,6 +32,8 @@ public:
 
     virtual void decode();
 
+    void _releaseOpenSL();
+
 private:
     void _play();
 
@@ -44,6 +46,12 @@ private:
     int bufferCount;
     int out_channels;
     int out_sampleSize;
+    SLObjectItf engineObject = NULL;
+    SLEngineItf engineInterface = NULL;
+    SLObjectItf outputMixObject = NULL;
+    SLObjectItf bqPlayerObject = NULL;
+    SLAndroidSimpleBufferQueueItf bqPlayerBufferQueue = NULL;
+    SLPlayItf bqPlayerInterface = NULL;
 };
 
 #endif //VIDEOPLAYER_AUDIOCHANNEL_H

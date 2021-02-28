@@ -39,7 +39,7 @@ public class EnjoyPlayer {
   }
 
   public void stop() {
-
+    stop(nativeHandle);
   }
 
   private native long nativeInit();
@@ -49,6 +49,8 @@ public class EnjoyPlayer {
   private native void prepare(long nativeHandle);
 
   private native void start(long nativeHandle);
+
+  private native void stop(long nativeHandle);
 
   private native void setSurface(long nativeHandle, Surface surface);
 

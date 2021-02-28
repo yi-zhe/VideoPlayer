@@ -20,7 +20,17 @@ void *prepare_t(void *args) {
 
 EnjoyPlayer::EnjoyPlayer(JavaCallHelper *helper) : helper(helper) {
     avformat_network_init();
-    videoChannel = 0;
+    videoChannel = nullptr;
+}
+
+EnjoyPlayer::~EnjoyPlayer() {
+    avformat_network_deinit();
+    delete helper;
+    helper = nullptr;
+    if (path) {
+        delete[] path;
+        path = nullptr;
+    }
 }
 
 void EnjoyPlayer::setDataSource(const char *path_) {
@@ -96,8 +106,15 @@ void EnjoyPlayer::_prepare() {
             audioChannel = new AudioChannel(i, helper, codecContext, avStream->time_base);
         } else if (parameters->codec_type == AVMEDIA_TYPE_VIDEO) {
             // 帧率
-            int fps = av_q2d(avStream->avg_frame_rate);
-            videoChannel = new VideoChannel(i, helper, codecContext, avStream->time_base, fps);
+            double fps = av_q2d(avStream->avg_frame_rate);
+            if (isnan(fps) || fps == 0) {
+                fps = av_q2d(avStream->r_frame_rate);
+            }
+            if (isnan(fps) || fps == 0) {
+                fps = av_q2d(av_guess_frame_rate(avFormatContext, avStream, nullptr));
+            }
+            videoChannel = new VideoChannel(
+                    i, helper, codecContext, avStream->time_base, (int) fps);
             videoChannel->setWindow(window);
         }
     }
@@ -123,6 +140,7 @@ void EnjoyPlayer::start() {
     //2、根据数据类型放入Audio/VideoChannel的队列中
     isPlaying = 1;
     if (videoChannel) {
+        videoChannel->audioChannel = audioChannel;
         videoChannel->play();
     }
     if (audioChannel) {
@@ -155,13 +173,38 @@ void EnjoyPlayer::_start() {
         }
     }
 
-    isPlaying = 0;
+    isPlaying = false;
     videoChannel->stop();
+    audioChannel->stop();
 }
 
 void EnjoyPlayer::setWindow(ANativeWindow *window) {
     this->window = window;
     if (videoChannel) {
         videoChannel->setWindow(window);
+    }
+}
+
+void EnjoyPlayer::stop() {
+    isPlaying = false;
+    // 等待线程执行结束
+    pthread_join(prepareTask, nullptr);
+    pthread_join(startTask, nullptr);
+    release();
+}
+
+void EnjoyPlayer::release() {
+    if (audioChannel) {
+        delete audioChannel;
+        audioChannel = nullptr;
+    }
+    if (videoChannel) {
+        delete videoChannel;
+        videoChannel = nullptr;
+    }
+    if (avFormatContext) {
+        avformat_close_input(&avFormatContext);
+        avformat_free_context(avFormatContext);
+        avFormatContext = nullptr;
     }
 }

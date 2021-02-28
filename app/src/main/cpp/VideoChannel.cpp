@@ -10,7 +10,11 @@ extern "C" {
 #include <libswscale/swscale.h>
 #include <libavutil/rational.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/time.h>
 }
+
+#define AV_SYNC_THRESHOLD_MIN 0.04
+#define AV_SYNC_THRESHOLD_MAX 0.1
 
 VideoChannel::VideoChannel(int channelId, JavaCallHelper *helper, AVCodecContext *avCodecContext,
                            const AVRational &base, int fps) :
@@ -53,6 +57,7 @@ void VideoChannel::_play() {
                    AV_PIX_FMT_RGBA, 1);
 
     AVFrame *frame = 0;  //100x100 ,window : 100x100
+    double frame_delay = 1.0 / fps;
     int ret;
     while (isPlaying) {
 
@@ -66,6 +71,26 @@ void VideoChannel::_play() {
         if (!ret) {
             continue;
         }
+        double extra_delay = frame->repeat_pict / (2.0 * fps);
+        double delay = frame_delay + extra_delay;
+        if (audioChannel) {
+            // best_effort_timestamp在大多数时间和pts一样, 但有特殊情况
+            clock = frame->best_effort_timestamp * av_q2d(time_base);
+            double diff = clock - audioChannel->clock;
+            // 给一个允许的时间差范围0.04 ~ 0.1 参考ffplay
+            double sync = FFMAX(AV_SYNC_THRESHOLD_MIN, FFMIN(AV_SYNC_THRESHOLD_MAX, delay));
+
+            if (diff <= -sync) {
+                // 修改delay变小些 快点赶上音频
+                delay = FFMAX(0, delay + diff);
+            } else if (diff > sync) {
+                // 视频太快 delay应该加大 等等音频
+                delay += diff;
+            }
+        }
+
+        av_usleep((int) (delay * 1000000));
+
         //todo 2、指针数据，比如RGBA，每一个维度的数据就是一个指针，那么RGBA需要4个指针，所以就是4个元素的数组，数组的元素就是指针，指针数据
         // 3、每一行数据他的数据个数
         // 4、 offset
@@ -74,10 +99,10 @@ void VideoChannel::_play() {
                   frame->height, data, linesize);
         //画画
         onDraw(data, linesize, avCodecContext->width, avCodecContext->height);
+        releaseAvFrame(frame);
     }
     av_free(&data[0]);
-    isPlaying = 0;
-    releaseAvFrame(frame);
+    isPlaying = false;
     sws_freeContext(swsContext);
 }
 
@@ -166,7 +191,15 @@ void VideoChannel::setWindow(ANativeWindow *window) {
 }
 
 void VideoChannel::stop() {
-
+    isPlaying = false;
+    helper = nullptr;
+    setEnable(0);
+    pthread_join(videoDecodeTask, nullptr);
+    pthread_join(videoPlayTask, nullptr);
+    if (window) {
+        ANativeWindow_release(window);
+        window = nullptr;
+    }
 }
 
 
