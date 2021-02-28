@@ -10,6 +10,7 @@
 
 #include "JavaCallHelper.h"
 #include "VideoChannel.h"
+#include "AudioChannel.h"
 
 extern "C" {
 #include <libavformat/avformat.h>
@@ -43,6 +44,7 @@ private:
     JavaCallHelper *helper;
     int64_t duration;
     VideoChannel *videoChannel;
+    AudioChannel *audioChannel;
 
     pthread_t startTask;
     bool isPlaying;

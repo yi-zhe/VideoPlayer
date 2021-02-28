@@ -7,6 +7,7 @@ add_library(
         EnjoyPlayer.cpp
         JavaCallHelper.cpp
         native-lib.cpp
+        AudioChannel.cpp
         VideoChannel.cpp)
 
 set(libs ${CMAKE_SOURCE_DIR}/${ANDROID_ABI})
@@ -25,6 +26,7 @@ target_link_libraries(
         swresample
         swscale
         rtmp
+        OpenSLES
         android
         z
         log)

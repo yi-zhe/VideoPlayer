@@ -93,7 +93,7 @@ void EnjoyPlayer::_prepare() {
 
 
         if (parameters->codec_type == AVMEDIA_TYPE_AUDIO) {
-
+            audioChannel = new AudioChannel(i, helper, codecContext, avStream->time_base);
         } else if (parameters->codec_type == AVMEDIA_TYPE_VIDEO) {
             // 帧率
             int fps = av_q2d(avStream->avg_frame_rate);
@@ -102,9 +102,7 @@ void EnjoyPlayer::_prepare() {
         }
     }
 
-    // todo 还没处理音频的
-    // 如果媒体文件中没有视频
-    if (!videoChannel) {
+    if (!videoChannel && !audioChannel) {
         helper->onError(FFMPEG_NOMEDIA, THREAD_CHILD);
         return;
     }
@@ -127,6 +125,9 @@ void EnjoyPlayer::start() {
     if (videoChannel) {
         videoChannel->play();
     }
+    if (audioChannel) {
+        audioChannel->play();
+    }
     pthread_create(&startTask, 0, start_t, this);
 }
 
@@ -138,6 +139,10 @@ void EnjoyPlayer::_start() {
         if (ret == 0) {
             if (videoChannel && packet->stream_index == videoChannel->channelId) {
                 videoChannel->pkt_queue.enQueue(packet);
+            } else if (audioChannel && packet->stream_index == audioChannel->channelId) {
+                audioChannel->pkt_queue.enQueue(packet);
+            } else {
+                av_packet_free(&packet);
             }
         } else if (ret == AVERROR_EOF) { //end of file
             //读取完毕，不一定播放完毕
