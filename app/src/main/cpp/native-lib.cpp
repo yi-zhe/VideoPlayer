@@ -83,11 +83,19 @@ Java_com_tools_player_EnjoyPlayer_setSurface(JNIEnv
     ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
     player->
             setWindow(window);
-}extern "C"
+}
+
+extern "C"
 JNIEXPORT void JNICALL
 Java_com_tools_player_EnjoyPlayer_stop(JNIEnv *env, jobject thiz, jlong nativeHandle) {
 
     EnjoyPlayer *player = reinterpret_cast<EnjoyPlayer *>(nativeHandle);
     player->stop();
     delete player;
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_tools_live_ScreenLive_connect(JNIEnv *env, jobject thiz, jstring url) {
+    return true;
 }
