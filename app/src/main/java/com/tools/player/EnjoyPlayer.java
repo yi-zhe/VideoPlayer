@@ -4,10 +4,6 @@ import android.view.Surface;
 
 public class EnjoyPlayer {
 
-  static {
-    System.loadLibrary("native-lib");
-  }
-
   private final long nativeHandle;
   private OnErrorListener onErrorListener;
   private OnProgressListener onProgressListener;
