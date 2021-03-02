@@ -19,6 +19,12 @@ public class VideoCodec extends Thread {
   private long timestamp;
   private MediaProjection mediaProjection;
   private VirtualDisplay virtualDisplay;
+  long startTime;
+  ScreenLive screenLive;
+
+  public VideoCodec(ScreenLive s) {
+    screenLive = s;
+  }
 
   public void startLive(MediaProjection mediaProjection) {
     this.mediaProjection = mediaProjection;
@@ -80,6 +86,15 @@ public class VideoCodec extends Thread {
         buffer.get(data);
 
         // 送到C++中封包再发送
+        RTMPPackage rtmpPackage = new RTMPPackage();
+        rtmpPackage.setBuffer(data);
+        rtmpPackage.setType(RTMPPackage.RTMP_PACKET_TYPE_VIDEO);
+        if (startTime == 0) {
+          startTime = bufferInfo.presentationTimeUs / 1000;
+        }
+        // 相对时间
+        rtmpPackage.setTms(bufferInfo.presentationTimeUs / 1000 - startTime);
+        screenLive.addPacket(rtmpPackage);
 
         // 释放
         mediaCodec.releaseOutputBuffer(index, false);
