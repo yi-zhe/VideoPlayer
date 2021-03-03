@@ -30,3 +30,13 @@ target_link_libraries(
         android
         z
         log)
+# 图像处理动态库
+add_library(
+        ImageUtils
+        SHARED
+        ImageUtils.cpp)
+
+target_link_libraries(
+        ImageUtils
+        yuv
+)

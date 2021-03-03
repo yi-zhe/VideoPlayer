@@ -14,7 +14,7 @@ public class ScreenLiveActivity extends AppCompatActivity {
   @Override
   protected void onCreate(@Nullable Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
-    setContentView(R.layout.activity_live);
+    setContentView(R.layout.activity_screen_live);
     screenLive = new ScreenLive();
   }
 
