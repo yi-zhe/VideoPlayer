@@ -13,6 +13,7 @@ public class RtmpClient {
   private int height;
   private volatile boolean isConnected;
   private VideoChannel videoChannel;
+  private AudioChannel audioChannel;
 
   public RtmpClient(LifecycleOwner lifecycleOwner) {
     this.lifecycleOwner = lifecycleOwner;
@@ -24,6 +25,12 @@ public class RtmpClient {
     this.height = height;
     videoChannel = new VideoChannel(lifecycleOwner, display, this);
     initVideoEnc(width, height, fps, bitRate);
+  }
+
+  public void initAudio(int sampleRate, int channels) {
+    audioChannel = new AudioChannel(sampleRate, channels, this);
+    int inputByteNum = initAudioEnc(sampleRate, channels);
+    audioChannel.setInputByteNum(inputByteNum);
   }
 
   public void toggleCamera() {
@@ -58,6 +65,7 @@ public class RtmpClient {
   private void onPrepare(boolean isConnect) {
     // 是否有多线程问题 子线程后值更改 对其他线程可见吗
     this.isConnected = isConnect;
+    audioChannel.start();
     Log.e(TAG, "开始直播==================");
     //通知UI
   }
@@ -66,9 +74,14 @@ public class RtmpClient {
     nativeSendVideo(buffer);
   }
 
+  public void sendAudio(byte[] buffer, int len) {
+    nativeSendAudio(buffer, len);
+  }
+
   public void release() {
     videoChannel.release();
     releaseVideoEnc();
+    releaseAudioEnc();
     nativeDeInit();
   }
 
@@ -85,4 +98,10 @@ public class RtmpClient {
   private native void nativeDeInit();
 
   private native void nativeSendVideo(byte[] buffer);
+
+  private native int initAudioEnc(int sampleRate, int channels);
+
+  private native void releaseAudioEnc();
+
+  private native void nativeSendAudio(byte[] buffer, int len);
 }

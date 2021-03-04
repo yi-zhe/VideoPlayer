@@ -9,7 +9,8 @@ add_library(
         native-lib.cpp
         AudioChannel.cpp
         VideoChannel.cpp
-        VideoChannelWithX264.cpp)
+        VideoChannelWithX264.cpp
+        AudioChannelWithFaac.cpp)
 
 set(libs ${CMAKE_SOURCE_DIR}/${ANDROID_ABI})
 
@@ -31,6 +32,7 @@ target_link_libraries(
         android
         z
         x264
+        faac
         log)
 # 图像处理动态库
 add_library(

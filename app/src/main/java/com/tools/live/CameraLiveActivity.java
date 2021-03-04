@@ -21,6 +21,7 @@ public class CameraLiveActivity extends AppCompatActivity {
     rtmpClient = new RtmpClient(this);
     //初始化摄像头， 同时 创建编码器
     rtmpClient.initVideo(textureView, width, height, 10, 640_000);
+    rtmpClient.initAudio(44100, 2);
   }
 
   public void startLive(View view) {

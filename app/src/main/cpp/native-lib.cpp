@@ -5,6 +5,7 @@
 #include "JavaCallHelper.h"
 #include "Log.h"
 #include "VideoChannelWithX264.h"
+#include "AudioChannelWithFaac.h"
 
 extern "C" {
 #include <librtmp/rtmp.h>
@@ -168,7 +169,19 @@ pthread_t pid;
 char *path = nullptr;
 uint64_t startTime = 0;
 pthread_mutex_t mutex;
+AudioChannel2 *audioChannel = nullptr;
+VideoChannel2 *videoChannel = nullptr;
 
+void callback(RTMPPacket *p) {
+    if (rtmp) {
+        p->m_nInfoField2 = rtmp->m_stream_id;
+        p->m_nTimeStamp = RTMP_GetTime() - startTime;
+        RTMP_SendPacket(rtmp, p, 1);
+    }
+    // TODO 为何Free后还需要delete
+    RTMPPacket_Free(p);
+    delete p;
+}
 
 extern "C"
 JNIEXPORT void JNICALL
@@ -187,6 +200,8 @@ void *connect(void *) {
         RTMP_EnableWrite(rtmp);
         if (!(ret = RTMP_Connect(rtmp, 0))) break;
         if (!(ret = RTMP_ConnectStream(rtmp, 0))) break;
+        RTMPPacket *packet = audioChannel->getAudioConfig();
+        callback(packet);
     } while (0);
 
     if (!ret) {
@@ -195,9 +210,7 @@ void *connect(void *) {
         rtmp = nullptr;
     } else {
         // 通知Java可以开始推流
-        LOGE("==##1");
         helper->onParpare2(THREAD_CHILD, true);
-        LOGE("==##2");
         startTime = RTMP_GetTime();
     }
 
@@ -216,21 +229,6 @@ Java_com_tools_live_RtmpClient_connect(JNIEnv *env, jobject thiz, jstring url_) 
     env->ReleaseStringUTFChars(url_, url);
 }
 
-VideoChannel2 *videoChannel = nullptr;
-
-void callback(RTMPPacket *p) {
-    pthread_mutex_lock(&mutex);
-    if (rtmp) {
-        p->m_nInfoField2 = rtmp->m_stream_id;
-        p->m_nTimeStamp = RTMP_GetTime() - startTime;
-        RTMP_SendPacket(rtmp, p, 1);
-    }
-    pthread_mutex_unlock(&mutex);
-    // TODO 为何Free后还需要delete
-    RTMPPacket_Free(p);
-    delete p;
-}
-
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_tools_live_RtmpClient_initVideoEnc(JNIEnv *env, jobject thiz, jint width, jint height,
@@ -245,7 +243,9 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_tools_live_RtmpClient_nativeSendVideo(JNIEnv *env, jobject thiz, jbyteArray buffer_) {
     jbyte *data = env->GetByteArrayElements(buffer_, nullptr);
+    pthread_mutex_lock(&mutex);
     videoChannel->encode(reinterpret_cast<uint8_t *>(data));
+    pthread_mutex_unlock(&mutex);
     env->ReleaseByteArrayElements(buffer_, data, 0);
 }
 
@@ -281,4 +281,37 @@ Java_com_tools_live_RtmpClient_nativeDeInit(JNIEnv *env, jobject thiz) {
         helper = nullptr;
     }
     pthread_mutex_destroy(&mutex);
+}
+
+extern "C"
+
+JNIEXPORT jint JNICALL
+Java_com_tools_live_RtmpClient_initAudioEnc(JNIEnv *env, jobject thiz, jint sample_rate,
+                                            jint channels) {
+    audioChannel = new AudioChannel2();
+    audioChannel->openCodec(sample_rate, channels);
+    audioChannel->setCallback(callback);
+    return audioChannel->getInputByteNum();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_live_RtmpClient_nativeSendAudio(JNIEnv *env, jobject thiz, jbyteArray buffer,
+                                               jint len) {
+    jbyte *data = env->GetByteArrayElements(buffer, nullptr);
+
+    pthread_mutex_lock(&mutex);
+    audioChannel->encode(reinterpret_cast<int32_t *>(data), len);
+    pthread_mutex_unlock(&mutex);
+
+    env->ReleaseByteArrayElements(buffer, data, 0);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_live_RtmpClient_releaseAudioEnc(JNIEnv *env, jobject thiz) {
+    if (audioChannel) {
+        delete audioChannel;
+        audioChannel = nullptr;
+    }
 }
