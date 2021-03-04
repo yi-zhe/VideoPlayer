@@ -38,6 +38,8 @@ public:
 
     void onParpare(int thread = THREAD_MAIN);
 
+    void onParpare2(int thread = THREAD_MAIN, bool isConnected=false);
+
     void onProgress(int progress, int thread = THREAD_MAIN);
 
 public:
@@ -46,9 +48,8 @@ public:
     jobject jobj;
     jmethodID jmid_error;
     jmethodID jmid_prepare;
+    jmethodID jmid_prepare2;
     jmethodID jmid_progress;
-
-
 };
 
 #endif //PLAYER_JAVACALLHELPER_H

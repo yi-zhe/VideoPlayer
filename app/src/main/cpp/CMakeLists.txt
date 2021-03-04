@@ -8,7 +8,8 @@ add_library(
         JavaCallHelper.cpp
         native-lib.cpp
         AudioChannel.cpp
-        VideoChannel.cpp)
+        VideoChannel.cpp
+        VideoChannelWithX264.cpp)
 
 set(libs ${CMAKE_SOURCE_DIR}/${ANDROID_ABI})
 
@@ -29,6 +30,7 @@ target_link_libraries(
         OpenSLES
         android
         z
+        x264
         log)
 # 图像处理动态库
 add_library(

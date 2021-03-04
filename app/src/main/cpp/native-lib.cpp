@@ -1,7 +1,10 @@
 #include <jni.h>
 #include <string>
+#include <pthread.h>
 #include "EnjoyPlayer.h"
 #include "JavaCallHelper.h"
+#include "Log.h"
+#include "VideoChannelWithX264.h"
 
 extern "C" {
 #include <librtmp/rtmp.h>
@@ -9,92 +12,55 @@ extern "C" {
 }
 JavaVM *javaVM = 0;
 
-JNIEXPORT jint
-
-JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     javaVM = vm;
     return JNI_VERSION_1_4;
 }
 
-
 extern "C"
-JNIEXPORT jlong
-
-JNICALL
+JNIEXPORT jlong JNICALL
 Java_com_tools_player_EnjoyPlayer_nativeInit(JNIEnv *env, jobject thiz) {
     EnjoyPlayer *player = new EnjoyPlayer(new JavaCallHelper(javaVM, env, thiz));
     return (jlong)
             player;
 }
 
-
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_tools_player_EnjoyPlayer_setDataSource(JNIEnv
-                                                *env,
-                                                jobject thiz, jlong
-                                                nativeHandle,
-                                                jstring path_
-) {
+Java_com_tools_player_EnjoyPlayer_setDataSource(JNIEnv *env, jobject thiz, jlong nativeHandle,
+                                                jstring path_) {
     const char *path = env->GetStringUTFChars(path_, 0);
     EnjoyPlayer *player = reinterpret_cast<EnjoyPlayer *>(nativeHandle);
-    player->
-            setDataSource(path);
-
-    env->
-            ReleaseStringUTFChars(path_, path
-    );
+    player->setDataSource(path);
+    env->ReleaseStringUTFChars(path_, path);
 }
-
-
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_tools_player_EnjoyPlayer_prepare(JNIEnv
-                                          *env,
-                                          jobject thiz, jlong
-                                          nativeHandle) {
+Java_com_tools_player_EnjoyPlayer_prepare(JNIEnv *env, jobject thiz, jlong nativeHandle) {
     EnjoyPlayer *player = reinterpret_cast<EnjoyPlayer *>(nativeHandle);
-    player->
-
-            prepare();
-
+    player->prepare();
 }
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_tools_player_EnjoyPlayer_start(JNIEnv
-                                        *env,
-                                        jobject thiz, jlong
-                                        nativeHandle) {
+Java_com_tools_player_EnjoyPlayer_start(JNIEnv *env, jobject thiz, jlong nativeHandle) {
     EnjoyPlayer *player = reinterpret_cast<EnjoyPlayer *>(nativeHandle);
-    player->
-
-            start();
-
+    player->start();
 }
-
-
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_tools_player_EnjoyPlayer_setSurface(JNIEnv
-                                             *env,
-                                             jobject thiz, jlong
-                                             nativeHandle,
-                                             jobject surface
-) {
-
+Java_com_tools_player_EnjoyPlayer_setSurface(JNIEnv *env, jobject thiz, jlong nativeHandle,
+                                             jobject surface) {
     EnjoyPlayer *player = reinterpret_cast<EnjoyPlayer *>(nativeHandle);
     ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
-    player->
-            setWindow(window);
+    player->setWindow(window);
 }
 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_tools_player_EnjoyPlayer_stop(JNIEnv *env, jobject thiz, jlong nativeHandle) {
-
     EnjoyPlayer *player = reinterpret_cast<EnjoyPlayer *>(nativeHandle);
     player->stop();
     delete player;
@@ -195,4 +161,124 @@ Java_com_tools_live_ScreenLive_sendData(JNIEnv *env, jobject thiz, jbyteArray da
     }
     env->ReleaseByteArrayElements(data_, data, 0);
     return ret;
+}
+
+JavaCallHelper *helper;
+pthread_t pid;
+char *path = nullptr;
+uint64_t startTime = 0;
+pthread_mutex_t mutex;
+
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_live_RtmpClient_nativeInit(JNIEnv *env, jobject thiz) {
+    helper = new JavaCallHelper(javaVM, env, thiz);
+    pthread_mutex_init(&mutex, nullptr);
+}
+
+void *connect(void *) {
+    int ret;
+    do {
+        rtmp = RTMP_Alloc();
+        RTMP_Init(rtmp);
+        if (!(ret = RTMP_SetupURL(rtmp, path))) break;
+        // 开启输出模式
+        RTMP_EnableWrite(rtmp);
+        if (!(ret = RTMP_Connect(rtmp, 0))) break;
+        if (!(ret = RTMP_ConnectStream(rtmp, 0))) break;
+    } while (0);
+
+    if (!ret) {
+        RTMP_Close(rtmp);
+        RTMP_Free(rtmp);
+        rtmp = nullptr;
+    } else {
+        // 通知Java可以开始推流
+        LOGE("==##1");
+        helper->onParpare2(THREAD_CHILD, true);
+        LOGE("==##2");
+        startTime = RTMP_GetTime();
+    }
+
+    delete path;
+    path = nullptr;
+    return nullptr;
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_live_RtmpClient_connect(JNIEnv *env, jobject thiz, jstring url_) {
+    const char *url = env->GetStringUTFChars(url_, nullptr);
+    path = new char[strlen(url) + 1];
+    memcpy(path, url, strlen(url));
+    pthread_create(&pid, nullptr, connect, (void *) url);
+    env->ReleaseStringUTFChars(url_, url);
+}
+
+VideoChannel2 *videoChannel = nullptr;
+
+void callback(RTMPPacket *p) {
+    pthread_mutex_lock(&mutex);
+    if (rtmp) {
+        p->m_nInfoField2 = rtmp->m_stream_id;
+        p->m_nTimeStamp = RTMP_GetTime() - startTime;
+        RTMP_SendPacket(rtmp, p, 1);
+    }
+    pthread_mutex_unlock(&mutex);
+    // TODO 为何Free后还需要delete
+    RTMPPacket_Free(p);
+    delete p;
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_live_RtmpClient_initVideoEnc(JNIEnv *env, jobject thiz, jint width, jint height,
+                                            jint fps, jint bit_rate) {
+    // 准备好编码器
+    videoChannel = new VideoChannel2;
+    videoChannel->openCodec(width, height, fps, bit_rate);
+    videoChannel->setCallback(callback);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_live_RtmpClient_nativeSendVideo(JNIEnv *env, jobject thiz, jbyteArray buffer_) {
+    jbyte *data = env->GetByteArrayElements(buffer_, nullptr);
+    videoChannel->encode(reinterpret_cast<uint8_t *>(data));
+    env->ReleaseByteArrayElements(buffer_, data, 0);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_live_RtmpClient_disConnect(JNIEnv *env, jobject thiz) {
+    pthread_mutex_lock(&mutex);
+    if (rtmp) {
+        RTMP_Close(rtmp);
+        RTMP_Free(rtmp);
+        rtmp = nullptr;
+    }
+    if (videoChannel) {
+        videoChannel->resetPts();
+    }
+    pthread_mutex_unlock(&mutex);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_live_RtmpClient_releaseVideoEnc(JNIEnv *env, jobject thiz) {
+    if (videoChannel) {
+        delete videoChannel;
+        videoChannel = nullptr;
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_live_RtmpClient_nativeDeInit(JNIEnv *env, jobject thiz) {
+    if (helper) {
+        delete helper;
+        helper = nullptr;
+    }
+    pthread_mutex_destroy(&mutex);
 }

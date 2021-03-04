@@ -9,9 +9,10 @@ JavaCallHelper::JavaCallHelper(JavaVM *_javaVM, JNIEnv *_env, jobject &_jobj) : 
     jobj = env->NewGlobalRef(_jobj);
     jclass jclazz = env->GetObjectClass(jobj);
 
-    jmid_error = env->GetMethodID(jclazz, "onError", "(I)V");
-    jmid_prepare = env->GetMethodID(jclazz, "onPrepare", "()V");
-    jmid_progress = env->GetMethodID(jclazz, "onProgress", "(I)V");
+//    jmid_error = env->GetMethodID(jclazz, "onError", "(I)V");
+//    jmid_prepare = env->GetMethodID(jclazz, "onPrepare", "()V");
+    jmid_prepare2 = env->GetMethodID(jclazz, "onPrepare", "(Z)V");
+//    jmid_progress = env->GetMethodID(jclazz, "onProgress", "(I)V");
 }
 
 JavaCallHelper::~JavaCallHelper() {
@@ -44,6 +45,19 @@ void JavaCallHelper::onParpare(int thread) {
         javaVM->DetachCurrentThread();
     } else {
         env->CallVoidMethod(jobj, jmid_prepare);
+    }
+}
+
+void JavaCallHelper::onParpare2(int thread, bool isConnected) {
+    if (thread == THREAD_CHILD) {
+        JNIEnv *jniEnv;
+        if (javaVM->AttachCurrentThread(&jniEnv, 0) != JNI_OK) {
+            return;
+        }
+        jniEnv->CallBooleanMethod(jobj, jmid_prepare2, isConnected);
+        javaVM->DetachCurrentThread();
+    } else {
+        env->CallBooleanMethod(jobj, jmid_prepare2, isConnected);
     }
 }
 
