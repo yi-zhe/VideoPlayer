@@ -1,6 +1,8 @@
 #include <jni.h>
 #include <string>
 #include <pthread.h>
+#include <opencv2/opencv.hpp>
+#include <opencv2/imgproc/types_c.h>
 #include "EnjoyPlayer.h"
 #include "JavaCallHelper.h"
 #include "Log.h"
@@ -11,10 +13,14 @@ extern "C" {
 #include <librtmp/rtmp.h>
 #include "packt.h"
 }
+
+using namespace cv;
+
 JavaVM *javaVM = 0;
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     javaVM = vm;
+    cv::DetectionBasedTracker::Parameters DetectorParams;
     return JNI_VERSION_1_4;
 }
 
@@ -168,7 +174,7 @@ JavaCallHelper *helper;
 pthread_t pid;
 char *path = nullptr;
 uint64_t startTime = 0;
-pthread_mutex_t mutex;
+pthread_mutex_t myMutex;
 AudioChannel2 *audioChannel = nullptr;
 VideoChannel2 *videoChannel = nullptr;
 
@@ -187,7 +193,7 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_tools_live_RtmpClient_nativeInit(JNIEnv *env, jobject thiz) {
     helper = new JavaCallHelper(javaVM, env, thiz);
-    pthread_mutex_init(&mutex, nullptr);
+    pthread_mutex_init(&myMutex, nullptr);
 }
 
 void *connect(void *) {
@@ -243,16 +249,16 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_tools_live_RtmpClient_nativeSendVideo(JNIEnv *env, jobject thiz, jbyteArray buffer_) {
     jbyte *data = env->GetByteArrayElements(buffer_, nullptr);
-    pthread_mutex_lock(&mutex);
+    pthread_mutex_lock(&myMutex);
     videoChannel->encode(reinterpret_cast<uint8_t *>(data));
-    pthread_mutex_unlock(&mutex);
+    pthread_mutex_unlock(&myMutex);
     env->ReleaseByteArrayElements(buffer_, data, 0);
 }
 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_tools_live_RtmpClient_disConnect(JNIEnv *env, jobject thiz) {
-    pthread_mutex_lock(&mutex);
+    pthread_mutex_lock(&myMutex);
     if (rtmp) {
         RTMP_Close(rtmp);
         RTMP_Free(rtmp);
@@ -261,7 +267,7 @@ Java_com_tools_live_RtmpClient_disConnect(JNIEnv *env, jobject thiz) {
     if (videoChannel) {
         videoChannel->resetPts();
     }
-    pthread_mutex_unlock(&mutex);
+    pthread_mutex_unlock(&myMutex);
 }
 
 extern "C"
@@ -280,7 +286,7 @@ Java_com_tools_live_RtmpClient_nativeDeInit(JNIEnv *env, jobject thiz) {
         delete helper;
         helper = nullptr;
     }
-    pthread_mutex_destroy(&mutex);
+    pthread_mutex_destroy(&myMutex);
 }
 
 extern "C"
@@ -300,9 +306,9 @@ Java_com_tools_live_RtmpClient_nativeSendAudio(JNIEnv *env, jobject thiz, jbyteA
                                                jint len) {
     jbyte *data = env->GetByteArrayElements(buffer, nullptr);
 
-    pthread_mutex_lock(&mutex);
+    pthread_mutex_lock(&myMutex);
     audioChannel->encode(reinterpret_cast<int32_t *>(data), len);
-    pthread_mutex_unlock(&mutex);
+    pthread_mutex_unlock(&myMutex);
 
     env->ReleaseByteArrayElements(buffer, data, 0);
 }
@@ -314,4 +320,180 @@ Java_com_tools_live_RtmpClient_releaseAudioEnc(JNIEnv *env, jobject thiz) {
         delete audioChannel;
         audioChannel = nullptr;
     }
+}
+
+class CascadeDetectorAdapter : public DetectionBasedTracker::IDetector {
+public:
+    CascadeDetectorAdapter(Ptr<CascadeClassifier> detector) :
+            IDetector(), Detector(detector) {
+        CV_Assert(detector);
+    }
+
+    void detect(const Mat &Image, vector<Rect> &objects) {
+        Detector->detectMultiScale(Image, objects, scaleFactor, minNeighbours, 0, minObjSize,
+                                   maxObjSize);
+    }
+
+private:
+    CascadeDetectorAdapter();
+
+    Ptr<CascadeClassifier> Detector;
+};
+
+class FaceTracker {
+public:
+    Ptr<DetectionBasedTracker> tracker;
+    pthread_mutex_t detectMutex;
+    ANativeWindow *window = nullptr;
+public:
+    FaceTracker(Ptr<DetectionBasedTracker> tracker) : tracker(tracker) {
+        pthread_mutex_init(&detectMutex, nullptr);
+    }
+
+    ~FaceTracker() {
+        pthread_mutex_destroy(&detectMutex);
+        if (this->window) {
+            ANativeWindow_release(this->window);
+            this->window = nullptr;
+        }
+    }
+
+    void setANativeWindow(ANativeWindow *w) {
+        pthread_mutex_lock(&detectMutex);
+        if (this->window) {
+            ANativeWindow_release(this->window);
+        }
+        this->window = w;
+        pthread_mutex_unlock(&detectMutex);
+    }
+
+    void draw(const Mat &img) {
+        pthread_mutex_lock(&detectMutex);
+        do {
+            if (window) {
+                ANativeWindow_setBuffersGeometry(window, img.cols, img.rows,
+                                                 WINDOW_FORMAT_RGBA_8888);
+                ANativeWindow_Buffer buffer;
+                if (ANativeWindow_lock(window, &buffer, nullptr)) {
+                    ANativeWindow_release(window);
+                    break;
+                }
+
+                uint8_t *dstData = static_cast<uint8_t *>(buffer.bits);
+                uint8_t *srcData = img.data;
+                int dstLineSize = buffer.stride * 4;
+                int srcLineSize = img.cols * 4;
+                for (int i = 0; i < buffer.height; i++) {
+                    memcpy(dstData + i * dstLineSize, srcData + i * img.cols * 4, srcLineSize);
+                }
+                ANativeWindow_unlockAndPost(window);
+            }
+        } while (false);
+        pthread_mutex_unlock(&detectMutex);
+    }
+};
+
+extern "C"
+JNIEXPORT jlong JNICALL
+Java_com_tools_cv_FaceTracker_nativeCreateObject(JNIEnv *env, jclass clazz, jstring model_) {
+    const char *model = env->GetStringUTFChars(model_, 0);
+
+    Ptr<CascadeDetectorAdapter> mainDetector = makePtr<CascadeDetectorAdapter>(
+            makePtr<CascadeClassifier>(model));
+    Ptr<CascadeDetectorAdapter> trackDetector = makePtr<CascadeDetectorAdapter>(
+            makePtr<CascadeClassifier>(model));
+
+    // 跟踪器
+    DetectionBasedTracker::Parameters DetectorParams;
+    FaceTracker *tracker = new FaceTracker(
+            makePtr<DetectionBasedTracker>(
+                    DetectionBasedTracker(mainDetector, trackDetector, DetectorParams)));
+
+    env->ReleaseStringUTFChars(model_, model);
+    return (jlong) tracker;
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_cv_FaceTracker_nativeDestroyObject(JNIEnv *env, jclass clazz, jlong thiz) {
+    if (thiz != 0) {
+        auto *tracker = (FaceTracker *) thiz;
+        tracker->tracker->stop();
+        delete tracker;
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_cv_FaceTracker_nativeSetSurface(JNIEnv *env, jclass clazz, jlong thiz,
+                                               jobject surface) {
+    if (thiz != 0) {
+        auto *tracker = (FaceTracker *) thiz;
+        if (!surface) {
+            tracker->setANativeWindow(nullptr);
+            return;
+        }
+        tracker->setANativeWindow(ANativeWindow_fromSurface(env, surface));
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_cv_FaceTracker_nativeStart(JNIEnv *env, jclass clazz, jlong thiz) {
+    if (thiz != 0) {
+        auto *tracker = (FaceTracker *) thiz;
+        tracker->tracker->run();
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_cv_FaceTracker_nativeStop(JNIEnv *env, jclass clazz, jlong thiz) {
+    if (thiz != 0) {
+        auto *tracker = (FaceTracker *) thiz;
+        tracker->tracker->stop();
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_cv_FaceTracker_nativeDetect(JNIEnv *env, jclass clazz, jlong thiz,
+                                           jbyteArray inputImage_, jint width, jint height,
+                                           jint rotation_degrees) {
+    if (thiz == 0) {
+        return;
+    }
+
+    jbyte *inputImage = env->GetByteArrayElements(inputImage_, nullptr);
+
+    // 8 8位 U unsigned C1 Channel通道 RGB是3通道
+    Mat src(height * 3 / 2, width, CV_8UC1, inputImage);
+
+    // 转为RGBA
+    cvtColor(src, src, CV_YUV2RGBA_I420);
+    // 旋转
+    if (rotation_degrees == 90) {
+        rotate(src, src, ROTATE_90_CLOCKWISE);
+    } else if (rotation_degrees == 270) {
+        rotate(src, src, ROTATE_90_COUNTERCLOCKWISE);
+    }
+//    flip(src, src, 1);
+    Mat gray;
+    cvtColor(src, gray, CV_RGB2GRAY);
+    equalizeHist(gray, gray);
+
+    auto *tracker = (FaceTracker *) thiz;
+    tracker->tracker->process(gray);
+    vector<Rect> faces;
+    tracker->tracker->getObjects(faces);
+    for (Rect face: faces) {
+        // 花矩形
+        rectangle(src, face, Scalar(255, 0, 255));
+    }
+
+    tracker->draw(src);
+
+
+    env->ReleaseByteArrayElements(inputImage_, inputImage, 0);
+
 }

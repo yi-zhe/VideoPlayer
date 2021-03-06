@@ -14,7 +14,7 @@ add_library(
 
 set(libs ${CMAKE_SOURCE_DIR}/${ANDROID_ABI})
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -L${libs}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -L${libs} -L${CMAKE_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}")
 
 
 include_directories(include)
@@ -33,6 +33,7 @@ target_link_libraries(
         z
         x264
         faac
+        opencv_java4
         log)
 # 图像处理动态库
 add_library(
