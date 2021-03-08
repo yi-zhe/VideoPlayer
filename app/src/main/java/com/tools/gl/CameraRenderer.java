@@ -2,11 +2,14 @@ package com.tools.gl;
 
 import android.content.Context;
 import android.graphics.SurfaceTexture;
+import android.opengl.EGL14;
 import android.opengl.GLSurfaceView;
 import androidx.camera.core.Preview;
 import androidx.lifecycle.LifecycleOwner;
 import com.tools.gl.filter.CameraFilter;
 import com.tools.gl.filter.ScreenFilter;
+import com.tools.gl.record.MediaRecorder;
+import java.io.IOException;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
@@ -23,6 +26,7 @@ public class CameraRenderer
 
   float[] mtx = new float[16];
   CameraFilter cameraFilter;
+  private MediaRecorder mRecorder;
 
   public CameraRenderer(CameraView cameraView) {
     this.cameraView = cameraView;
@@ -42,6 +46,10 @@ public class CameraRenderer
     cameraFilter = new CameraFilter(cxt);
 
     screenFilter = new ScreenFilter(cameraView.getContext());
+
+    mRecorder = new MediaRecorder(cameraView.getContext(), "/sdcard/a.mp4",
+        EGL14.eglGetCurrentContext(),
+        480, 640);
   }
 
   @Override
@@ -58,7 +66,8 @@ public class CameraRenderer
 
     cameraFilter.setTransformMatrix(mtx);
     int id = cameraFilter.onDraw(textures[0]);
-    screenFilter.onDraw(id);
+    id = screenFilter.onDraw(id);
+    mRecorder.fireFrame(id, mCameraTexure.getTimestamp());
   }
 
   public void onSurfaceDestroyed() {
@@ -79,5 +88,17 @@ public class CameraRenderer
   @Override
   public void onFrameAvailable(SurfaceTexture surfaceTexture) {
     cameraView.requestRender();
+  }
+
+  public void startRecord(float speed) {
+    try {
+      mRecorder.start(speed);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+  public void stopRecord() {
+    mRecorder.stop();
   }
 }
