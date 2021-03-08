@@ -1,9 +1,12 @@
 package com.tools.gl;
 
+import android.content.Context;
 import android.graphics.SurfaceTexture;
 import android.opengl.GLSurfaceView;
 import androidx.camera.core.Preview;
 import androidx.lifecycle.LifecycleOwner;
+import com.tools.gl.filter.CameraFilter;
+import com.tools.gl.filter.ScreenFilter;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
@@ -19,6 +22,7 @@ public class CameraRenderer
   private ScreenFilter screenFilter;
 
   float[] mtx = new float[16];
+  CameraFilter cameraFilter;
 
   public CameraRenderer(CameraView cameraView) {
     this.cameraView = cameraView;
@@ -33,11 +37,16 @@ public class CameraRenderer
     mCameraTexure.attachToGLContext(textures[0]);
     // 摄像头数据有更新的时候会回调
     mCameraTexure.setOnFrameAvailableListener(this);
+
+    Context cxt = cameraView.getContext();
+    cameraFilter = new CameraFilter(cxt);
+
     screenFilter = new ScreenFilter(cameraView.getContext());
   }
 
   @Override
   public void onSurfaceChanged(GL10 gl, int width, int height) {
+    cameraFilter.setSize(width, height);
     screenFilter.setSize(width, height);
   }
 
@@ -47,12 +56,14 @@ public class CameraRenderer
     mCameraTexure.updateTexImage();
     mCameraTexure.getTransformMatrix(mtx);
 
-    screenFilter.setTransformMatrix(mtx);
-    screenFilter.onDraw(textures[0]);
+    cameraFilter.setTransformMatrix(mtx);
+    int id = cameraFilter.onDraw(textures[0]);
+    screenFilter.onDraw(id);
   }
 
   public void onSurfaceDestroyed() {
-
+    cameraFilter.release();
+    screenFilter.release();
   }
 
   /**
