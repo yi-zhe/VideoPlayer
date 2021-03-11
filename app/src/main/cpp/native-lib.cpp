@@ -8,6 +8,7 @@
 #include "Log.h"
 #include "VideoChannelWithX264.h"
 #include "AudioChannelWithFaac.h"
+#include "FaceTrack.h"
 
 extern "C" {
 #include <librtmp/rtmp.h>
@@ -322,23 +323,23 @@ Java_com_tools_live_RtmpClient_releaseAudioEnc(JNIEnv *env, jobject thiz) {
     }
 }
 
-class CascadeDetectorAdapter : public DetectionBasedTracker::IDetector {
-public:
-    CascadeDetectorAdapter(Ptr<CascadeClassifier> detector) :
-            IDetector(), Detector(detector) {
-        CV_Assert(detector);
-    }
-
-    void detect(const Mat &Image, vector<Rect> &objects) {
-        Detector->detectMultiScale(Image, objects, scaleFactor, minNeighbours, 0, minObjSize,
-                                   maxObjSize);
-    }
-
-private:
-    CascadeDetectorAdapter();
-
-    Ptr<CascadeClassifier> Detector;
-};
+//class CascadeDetectorAdapter : public DetectionBasedTracker::IDetector {
+//public:
+//    CascadeDetectorAdapter(Ptr<CascadeClassifier> detector) :
+//            IDetector(), Detector(detector) {
+//        CV_Assert(detector);
+//    }
+//
+//    void detect(const Mat &Image, vector<Rect> &objects) {
+//        Detector->detectMultiScale(Image, objects, scaleFactor, minNeighbours, 0, minObjSize,
+//                                   maxObjSize);
+//    }
+//
+//private:
+//    CascadeDetectorAdapter();
+//
+//    Ptr<CascadeClassifier> Detector;
+//};
 
 class FaceTracker {
 public:
@@ -484,9 +485,9 @@ Java_com_tools_cv_FaceTracker_nativeDetect(JNIEnv *env, jclass clazz, jlong thiz
 
     auto *tracker = (FaceTracker *) thiz;
     tracker->tracker->process(gray);
-    vector<Rect> faces;
+    vector<cv::Rect> faces;
     tracker->tracker->getObjects(faces);
-    for (Rect face: faces) {
+    for (cv::Rect face: faces) {
         // 花矩形
         rectangle(src, face, Scalar(255, 0, 255));
     }
@@ -496,4 +497,98 @@ Java_com_tools_cv_FaceTracker_nativeDetect(JNIEnv *env, jclass clazz, jlong thiz
 
     env->ReleaseByteArrayElements(inputImage_, inputImage, 0);
 
+}
+
+extern "C"
+JNIEXPORT jlong JNICALL
+Java_com_tools_cv_FaceTracker2_nativeCreateObject(JNIEnv *env, jclass clazz, jstring facemodel_,
+                                                  jstring landmarkermodel_) {
+    const char *facemodel = env->GetStringUTFChars(facemodel_, 0);
+    const char *landmarkermodel = env->GetStringUTFChars(landmarkermodel_, 0);
+
+    FaceTrack *faceTrack = new FaceTrack(facemodel, landmarkermodel);
+
+    env->ReleaseStringUTFChars(facemodel_, facemodel);
+    env->ReleaseStringUTFChars(landmarkermodel_, landmarkermodel);
+    return (jlong) faceTrack;
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_cv_FaceTracker2_nativeDestroyObject(JNIEnv *env, jclass clazz, jlong thiz) {
+    if (thiz != 0) {
+        FaceTrack *tracker = reinterpret_cast<FaceTrack *>(thiz);
+        tracker->stop();
+        delete tracker;
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_cv_FaceTracker2_nativeStart(JNIEnv *env, jclass clazz, jlong thiz) {
+    if (thiz != 0) {
+        FaceTrack *tracker = reinterpret_cast<FaceTrack *>(thiz);
+        tracker->run();
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tools_cv_FaceTracker2_nativeStop(JNIEnv *env, jclass clazz, jlong thiz) {
+    if (thiz != 0) {
+        FaceTrack *tracker = reinterpret_cast<FaceTrack *>(thiz);
+        tracker->stop();
+    }
+}
+
+extern "C"
+JNIEXPORT jobject JNICALL
+Java_com_tools_cv_FaceTracker2_nativeDetect(JNIEnv *env, jclass clazz, jlong thiz,
+                                            jbyteArray inputImage_, jint width, jint height,
+                                            jint rotationDegrees) {
+    if (thiz == 0) {
+        return 0;
+    }
+    FaceTrack *tracker = reinterpret_cast<FaceTrack *>(thiz);
+    jbyte *inputImage = env->GetByteArrayElements(inputImage_, 0);
+
+    //I420
+    Mat src(height * 3 / 2, width, CV_8UC1, inputImage);
+
+    // 转为RGBA
+    cvtColor(src, src, CV_YUV2RGBA_I420);
+    //旋转
+    if (rotationDegrees == 90) {
+        rotate(src, src, ROTATE_90_CLOCKWISE);
+    } else if (rotationDegrees == 270) {
+        rotate(src, src, ROTATE_90_COUNTERCLOCKWISE);
+    }
+    //镜像问题，可以使用此方法进行垂直翻转
+//    flip(src,src,1);
+    Mat gray;
+    cvtColor(src, gray, CV_RGBA2GRAY);
+    equalizeHist(gray, gray);
+
+    cv::Rect face;
+    std::vector<SeetaPointF> points;
+    tracker->process(gray, face, points);
+
+
+    int w = src.cols;
+    int h = src.rows;
+    gray.release();
+    src.release();
+    env->ReleaseByteArrayElements(inputImage_, inputImage, 0);
+
+    if (!face.empty() && !points.empty()) {
+        jclass cls = env->FindClass("com/tools/cv/Face");
+        jmethodID construct = env->GetMethodID(cls, "<init>", "(IIIIIIFFFF)V");
+        SeetaPointF left = points[0];
+        SeetaPointF right = points[1];
+        jobject obj = env->NewObject(cls, construct, face.width, face.height, w, h, face.x, face.y,
+                                     left.x, left.y, right.x, right.y);
+        return obj;
+    }
+
+    return nullptr;
 }

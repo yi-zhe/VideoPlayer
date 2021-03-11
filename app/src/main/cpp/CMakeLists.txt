@@ -10,7 +10,8 @@ add_library(
         AudioChannel.cpp
         VideoChannel.cpp
         VideoChannelWithX264.cpp
-        AudioChannelWithFaac.cpp)
+        AudioChannelWithFaac.cpp
+        FaceTrack.cpp)
 
 set(libs ${CMAKE_SOURCE_DIR}/${ANDROID_ABI})
 
@@ -34,6 +35,7 @@ target_link_libraries(
         x264
         faac
         opencv_java4
+        SeetaFaceLandmarker
         log)
 # 图像处理动态库
 add_library(

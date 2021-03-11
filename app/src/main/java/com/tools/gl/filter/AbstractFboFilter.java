@@ -13,9 +13,7 @@ public class AbstractFboFilter extends AbstractFilter {
     super(context, vertexShaderId, fragmentShaderId);
   }
 
-  @Override
-  public void setSize(int width, int height) {
-    super.setSize(width, height);
+  public void createFrame(int width, int height) {
     releaseFrame();
     //創建FBO
     /**
@@ -48,11 +46,15 @@ public class AbstractFboFilter extends AbstractFilter {
   }
 
   @Override
-  public int onDraw(int texture) {
+  public int onDraw(int texture, FilterChain filterChain) {
+    FilterContext filterContext = filterChain.filterContext;
+    createFrame(filterContext.width, filterContext.height);
+
     GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, frameBuffer[0]); //綁定fbo
-    super.onDraw(texture);
+    super.onDraw(texture, filterChain);
     GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);  //
-    return frameTextures[0];
+
+    return filterChain.proceed(frameTextures[0]);
   }
 
   @Override

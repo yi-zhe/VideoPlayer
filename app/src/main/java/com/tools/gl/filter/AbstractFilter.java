@@ -10,8 +10,6 @@ import java.nio.FloatBuffer;
 public class AbstractFilter {
   FloatBuffer vertexBuffer; //顶点坐标缓存区
   FloatBuffer textureBuffer; // 纹理坐标
-  int mWidth;
-  int mHeight;
   int program;
   int vPosition;
   int vCoord;
@@ -29,10 +27,10 @@ public class AbstractFilter {
   }
 
   public void initGL(Context context, int vertexShaderId, int fragmentShaderId) {
-    String vertexShader = OpenGLUtils.readRawTextFile(context, vertexShaderId);
-    String fragShader = OpenGLUtils.readRawTextFile(context, fragmentShaderId);
+    String vertexSharder = OpenGLUtils.readRawTextFile(context, vertexShaderId);
+    String fragSharder = OpenGLUtils.readRawTextFile(context, fragmentShaderId);
     //着色器程序准备好
-    program = OpenGLUtils.loadProgram(vertexShader, fragShader);
+    program = OpenGLUtils.loadProgram(vertexSharder, fragSharder);
 
     //获取程序中的变量 索引
     vPosition = GLES20.glGetAttribLocation(program, "vPosition");
@@ -48,14 +46,10 @@ public class AbstractFilter {
     textureBuffer.put(OpenGLUtils.TEXURE);
   }
 
-  public void setSize(int width, int height) {
-    mWidth = width;
-    mHeight = height;
-  }
-
-  public int onDraw(int texture) {
+  public int onDraw(int texture, FilterChain filterChain) {
+    FilterContext filterContext = filterChain.filterContext;
     //设置绘制区域
-    GLES20.glViewport(0, 0, mWidth, mHeight);
+    GLES20.glViewport(0, 0, filterContext.width, filterContext.height);
 
     GLES20.glUseProgram(program);
 

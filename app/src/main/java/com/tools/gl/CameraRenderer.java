@@ -6,10 +6,16 @@ import android.opengl.EGL14;
 import android.opengl.GLSurfaceView;
 import androidx.camera.core.Preview;
 import androidx.lifecycle.LifecycleOwner;
+import com.tools.gl.filter.AbstractFilter;
+import com.tools.gl.filter.BigEyeFilter;
 import com.tools.gl.filter.CameraFilter;
+import com.tools.gl.filter.FilterChain;
+import com.tools.gl.filter.FilterContext;
 import com.tools.gl.filter.ScreenFilter;
 import com.tools.gl.record.MediaRecorder;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
@@ -19,17 +25,20 @@ public class CameraRenderer
   private CameraView cameraView;
   private CameraHelper cameraHelper;
   // 摄像头的图像  用OpenGL ES 画出来
-  private SurfaceTexture mCameraTexure;
+  private SurfaceTexture mCameraTexture;
 
   private int[] textures;
-  private ScreenFilter screenFilter;
 
   float[] mtx = new float[16];
-  CameraFilter cameraFilter;
   private MediaRecorder mRecorder;
+  private FilterChain filterChain;
 
   public CameraRenderer(CameraView cameraView) {
     this.cameraView = cameraView;
+    OpenGLUtils.copyAssets2SdCard(cameraView.getContext(), "lbpcascade_frontalface.xml",
+        "/sdcard/lbpcascade_frontalface.xml");
+    OpenGLUtils.copyAssets2SdCard(cameraView.getContext(), "pd_2_00_pts5.dat",
+        "/sdcard/pd_2_00_pts5.dat");
     LifecycleOwner lifecycleOwner = (LifecycleOwner) cameraView.getContext();
     cameraHelper = new CameraHelper(lifecycleOwner, this);
   }
@@ -38,14 +47,17 @@ public class CameraRenderer
   public void onSurfaceCreated(GL10 gl, EGLConfig config) {
     // 创建OpenGL纹理 把摄像头的数据与纹理关联
     textures = new int[1]; // 能在OpenGL中用的图片的id
-    mCameraTexure.attachToGLContext(textures[0]);
+    mCameraTexture.attachToGLContext(textures[0]);
     // 摄像头数据有更新的时候会回调
-    mCameraTexure.setOnFrameAvailableListener(this);
+    mCameraTexture.setOnFrameAvailableListener(this);
 
     Context cxt = cameraView.getContext();
-    cameraFilter = new CameraFilter(cxt);
+    List<AbstractFilter> filters = new ArrayList<>();
+    filters.add(new CameraFilter(cxt));
+    filters.add(new BigEyeFilter(cxt));
+    filters.add(new ScreenFilter(cxt));
 
-    screenFilter = new ScreenFilter(cameraView.getContext());
+    filterChain = new FilterChain(filters, 0, new FilterContext());
 
     mRecorder = new MediaRecorder(cameraView.getContext(), "/sdcard/a.mp4",
         EGL14.eglGetCurrentContext(),
@@ -54,25 +66,23 @@ public class CameraRenderer
 
   @Override
   public void onSurfaceChanged(GL10 gl, int width, int height) {
-    cameraFilter.setSize(width, height);
-    screenFilter.setSize(width, height);
+    filterChain.setSize(width, height);
   }
 
   @Override
   public void onDrawFrame(GL10 gl) {
     // 更新纹理
-    mCameraTexure.updateTexImage();
-    mCameraTexure.getTransformMatrix(mtx);
+    mCameraTexture.updateTexImage();
+    mCameraTexture.getTransformMatrix(mtx);
 
-    cameraFilter.setTransformMatrix(mtx);
-    int id = cameraFilter.onDraw(textures[0]);
-    id = screenFilter.onDraw(id);
-    mRecorder.fireFrame(id, mCameraTexure.getTimestamp());
+    filterChain.setTransformMatrix(mtx);
+    filterChain.setFace(cameraHelper.getFace());
+    int id = filterChain.proceed(textures[0]);
+    mRecorder.fireFrame(id, mCameraTexture.getTimestamp());
   }
 
   public void onSurfaceDestroyed() {
-    cameraFilter.release();
-    screenFilter.release();
+    filterChain.release();
   }
 
   /**
@@ -82,7 +92,7 @@ public class CameraRenderer
    */
   @Override
   public void onUpdated(Preview.PreviewOutput output) {
-    mCameraTexure = output.getSurfaceTexture();
+    mCameraTexture = output.getSurfaceTexture();
   }
 
   @Override
