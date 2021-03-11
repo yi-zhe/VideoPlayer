@@ -21,23 +21,16 @@ public class OpenGLUtils {
   };
 
   public static final float[] TEXURE = {
+      0.0f, 0.0f,
+      1.0f, 0.0f,
       0.0f, 1.0f,
       1.0f, 1.0f,
-      0.0f, 0.0f,
-      1.0f, 0.0f
-  };
-
-  public static final float[] TEXTURE_NO_ROTATION = {
-      0.0f, 1.0f,
-      1.0f, 1.0f,
-      0.0f, 0.0f,
-      1.0f, 0.0f
   };
 
   public static void glGenTextures(int[] textures) {
     GLES20.glGenTextures(textures.length, textures, 0);
     for (int i = 0; i < textures.length; i++) {
-      //与摄像头不同,摄像头是外部纹理 external oes
+      //绑定纹理，后续配置纹理
       GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textures[i]);
 
       /**
