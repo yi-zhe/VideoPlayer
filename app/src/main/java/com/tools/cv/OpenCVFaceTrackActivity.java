@@ -74,7 +74,8 @@ public class OpenCVFaceTrackActivity extends AppCompatActivity implements ImageA
 
   public static void requestPermission(AppCompatActivity act) {
     PermissionX.init(act)
-        .permissions(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA)
+        .permissions(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE)
         .request(new RequestCallback() {
           @Override
           public void onResult(boolean allGranted, List<String> grantedList,

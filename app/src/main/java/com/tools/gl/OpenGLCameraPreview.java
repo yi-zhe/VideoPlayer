@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.widget.RadioGroup;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import com.tools.cv.OpenCVFaceTrackActivity;
 import com.tools.player.R;
 
 public class OpenGLCameraPreview extends AppCompatActivity
@@ -13,6 +14,7 @@ public class OpenGLCameraPreview extends AppCompatActivity
   @Override
   protected void onCreate(@Nullable Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
+    OpenCVFaceTrackActivity.requestPermission(this);
     setContentView(R.layout.activity_gl_camera_preview);
     cameraView = findViewById(R.id.cameraView);
     RecordButton btn_record = findViewById(R.id.btn_record);
