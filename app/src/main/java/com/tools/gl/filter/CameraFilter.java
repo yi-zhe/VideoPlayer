@@ -25,8 +25,8 @@ public class CameraFilter extends AbstractFboFilter {
   }
 
   @Override
-  public void beforeDraw() {
-    super.beforeDraw();
+  public void beforeDraw(FilterContext filterContext) {
+    super.beforeDraw(filterContext);
     GLES20.glUniformMatrix4fv(vMatrix, 1, false, mtx, 0);
   }
 }

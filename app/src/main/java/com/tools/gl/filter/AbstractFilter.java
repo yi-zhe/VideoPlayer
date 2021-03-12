@@ -72,16 +72,19 @@ public class AbstractFilter {
     // GL_TEXTURE1 ， 1
     GLES20.glUniform1i(vTexture, 0);
 
-    beforeDraw();
+    beforeDraw(filterContext);
     //通知画画，
     GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+    afterDraw(filterContext);
 
     GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
-
     return texture;
   }
 
-  public void beforeDraw() {
+  public void beforeDraw(FilterContext filterContext) {
+  }
+
+  public void afterDraw(FilterContext filterContext) {
   }
 
   public void release() {

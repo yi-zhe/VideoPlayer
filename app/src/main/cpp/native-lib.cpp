@@ -582,11 +582,15 @@ Java_com_tools_cv_FaceTracker2_nativeDetect(JNIEnv *env, jclass clazz, jlong thi
 
     if (!face.empty() && !points.empty()) {
         jclass cls = env->FindClass("com/tools/cv/Face");
-        jmethodID construct = env->GetMethodID(cls, "<init>", "(IIIIIIFFFF)V");
+        jmethodID construct = env->GetMethodID(cls, "<init>", "(IIIIIIFFFFFFFFFF)V");
         SeetaPointF left = points[0];
         SeetaPointF right = points[1];
+        SeetaPointF nose = points[2];
+        SeetaPointF mouseLeft = points[3];
+        SeetaPointF mouseRight = points[4];
         jobject obj = env->NewObject(cls, construct, face.width, face.height, w, h, face.x, face.y,
-                                     left.x, left.y, right.x, right.y);
+                                     left.x, left.y, right.x, right.y, nose.x, nose.y,mouseLeft.x,
+                                     mouseLeft.y, mouseRight.x, mouseRight.y);
         return obj;
     }
 
