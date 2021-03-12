@@ -7,12 +7,12 @@ import android.opengl.GLSurfaceView;
 import androidx.camera.core.Preview;
 import androidx.lifecycle.LifecycleOwner;
 import com.tools.gl.filter.AbstractFilter;
-import com.tools.gl.filter.BigEyeFilter;
 import com.tools.gl.filter.CameraFilter;
 import com.tools.gl.filter.FilterChain;
 import com.tools.gl.filter.FilterContext;
 import com.tools.gl.filter.ScreenFilter;
 import com.tools.gl.filter.StickFilter;
+import com.tools.gl.filter.beauty.BeautyFilter;
 import com.tools.gl.record.MediaRecorder;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -56,6 +56,7 @@ public class CameraRenderer
     List<AbstractFilter> filters = new ArrayList<>();
     filters.add(new CameraFilter(cxt));
     filters.add(new StickFilter(cxt));
+    filters.add(new BeautyFilter(cxt));
     filters.add(new ScreenFilter(cxt));
 
     filterChain = new FilterChain(filters, 0, new FilterContext());

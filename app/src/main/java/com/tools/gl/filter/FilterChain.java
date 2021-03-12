@@ -8,11 +8,16 @@ public class FilterChain {
   public FilterContext filterContext;
   private List<AbstractFilter> filters;
   private int index;
+  private boolean pause = false;
 
   public FilterChain(List<AbstractFilter> filters, int index, FilterContext filterContext) {
     this.filters = filters;
     this.index = index;
     this.filterContext = filterContext;
+  }
+
+  public void setPause(boolean pause) {
+    this.pause = pause;
   }
 
   public int proceed(int textureId) {

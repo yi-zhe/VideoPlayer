@@ -10,20 +10,22 @@ import java.nio.FloatBuffer;
 public class AbstractFilter {
   FloatBuffer vertexBuffer; //顶点坐标缓存区
   FloatBuffer textureBuffer; // 纹理坐标
-  int program;
+  protected int program;
   int vPosition;
   int vCoord;
   int vTexture;
 
   public AbstractFilter(Context context, int vertexShaderId, int fragmentShaderId) {
-    //準備數據
-    vertexBuffer = ByteBuffer.allocateDirect(4 * 4 * 2).order(ByteOrder.nativeOrder())
-        .asFloatBuffer();
-    textureBuffer = ByteBuffer.allocateDirect(4 * 4 * 2).order(ByteOrder.nativeOrder())
-        .asFloatBuffer();
+    if (vertexShaderId != -1 && fragmentShaderId != -1) {
+      //準備數據
+      vertexBuffer = ByteBuffer.allocateDirect(4 * 4 * 2).order(ByteOrder.nativeOrder())
+          .asFloatBuffer();
+      textureBuffer = ByteBuffer.allocateDirect(4 * 4 * 2).order(ByteOrder.nativeOrder())
+          .asFloatBuffer();
 
-    initCoord();
-    initGL(context, vertexShaderId, fragmentShaderId);
+      initCoord();
+      initGL(context, vertexShaderId, fragmentShaderId);
+    }
   }
 
   public void initGL(Context context, int vertexShaderId, int fragmentShaderId) {
