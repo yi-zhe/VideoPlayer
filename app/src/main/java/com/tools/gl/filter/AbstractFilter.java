@@ -45,7 +45,7 @@ public class AbstractFilter {
     vertexBuffer.put(OpenGLUtils.VERTEX);
 
     textureBuffer.clear();
-    textureBuffer.put(OpenGLUtils.TEXURE);
+    textureBuffer.put(OpenGLUtils.TEXTURE);
   }
 
   public int onDraw(int texture, FilterChain filterChain) {

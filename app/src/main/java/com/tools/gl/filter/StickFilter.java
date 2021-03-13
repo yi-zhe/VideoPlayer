@@ -25,6 +25,14 @@ public class StickFilter extends AbstractFboFilter {
   }
 
   @Override
+  public int onDraw(int texture, FilterChain filterChain) {
+    textureBuffer.clear();
+    textureBuffer.put(OpenGLUtils.TEXTURE);
+    textureBuffer.position(0);
+    return super.onDraw(texture, filterChain);
+  }
+
+  @Override
   public void afterDraw(FilterContext filterContext) {
     super.afterDraw(filterContext);
     // 画鼻子
@@ -60,6 +68,8 @@ public class StickFilter extends AbstractFboFilter {
     //CPU传数据到GPU，默认情况下着色器无法读取到这个数据。 需要我们启用一下才可以读取
     GLES20.glEnableVertexAttribArray(vPosition);
 
+    textureBuffer.clear();
+    textureBuffer.put(OpenGLUtils.TEXTURE_180);
     textureBuffer.position(0);
     // 4、归一化 normalized  [-1,1] . 把[2,2]转换为[-1,1]
     GLES20.glVertexAttribPointer(vCoord, 2, GLES20.GL_FLOAT, false, 0, textureBuffer);
