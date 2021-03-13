@@ -12,6 +12,7 @@ import com.tools.gl.filter.FilterChain;
 import com.tools.gl.filter.FilterContext;
 import com.tools.gl.filter.ScreenFilter;
 import com.tools.gl.filter.SoulFilter;
+import com.tools.gl.filter.SplitFilter;
 import com.tools.gl.filter.StickFilter;
 import com.tools.gl.filter.beauty.BeautyFilter;
 import com.tools.gl.record.MediaRecorder;
@@ -57,7 +58,7 @@ public class CameraRenderer
     List<AbstractFilter> filters = new ArrayList<>();
     filters.add(new CameraFilter(cxt));
     filters.add(new StickFilter(cxt));
-    filters.add(new SoulFilter(cxt));
+    filters.add(new SplitFilter(cxt));
     filters.add(new ScreenFilter(cxt));
 
     filterChain = new FilterChain(filters, 0, new FilterContext());
